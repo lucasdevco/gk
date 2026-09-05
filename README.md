@@ -1,65 +1,110 @@
 # GK
 
-GK 是一个可直接开始写业务的 Go + React 全栈模板。它保留了大型 Go 项目里真正有价值的结构：单一组合根、按领域组织、类型安全 SQL、OpenAPI 合约、统一生命周期和可观测性，但不预装与业务无关的框架。
+English · [简体中文](README.zh_CN.md)
 
-## 快速开始
+GK is a Go + React full-stack starter for building web services with a practical foundation: PostgreSQL, type-safe SQL, OpenAPI contracts, structured logging, and OpenTelemetry. The frontend builds into the Go binary, so you can deploy the application as one executable alongside your database.
 
-要求：`mise`、Docker。
+## Why GK
+
+- **Start with a working feature.** The removable task example connects a React screen to HTTP handlers, business logic, SQL queries, and database migrations. Use it as a reference when adding your own features.
+- **Keep changes close to the business.** Code lives in `internal/<domain>`, with dependencies assembled in one place. Domain models stay separate from HTTP payloads and database rows, making features easier to understand and test.
+- **Keep contracts explicit.** OpenAPI generates Go HTTP bindings and TypeScript client code; the frontend uses generated domain types. sqlc generates typed Go queries from SQL you can read and tune directly.
+- **Ship a single application binary.** Go embeds the built React app and Goose migrations. Production does not need a Node.js server to serve the frontend; PostgreSQL remains a separate dependency.
+- **Diagnose requests across layers.** Structured logs carry request IDs and, when tracing is enabled, trace and span IDs. OpenTelemetry exports HTTP traces and metrics, Go runtime metrics, and PostgreSQL connection-pool metrics.
+- **Use one development workflow.** mise pins tools and provides commands for generation, development, builds, tests, and migrations. A GitHub Actions workflow runs the verification pipeline.
+
+GK suits internal tools, dashboards, and small-to-medium web applications that need a Go backend and a React UI. Authentication and authorization are not included; add them before exposing private data or protected operations.
+
+## Stack
+
+| Area | Tools |
+| --- | --- |
+| Backend | Go, standard-library `net/http` |
+| Frontend | React, TypeScript, Vite, Tailwind CSS, TanStack Query |
+| Database | PostgreSQL, pgx, sqlc, Goose |
+| Contracts | OpenAPI, oapi-codegen, @hey-api/openapi-ts |
+| Operations | slog, OpenTelemetry, health checks, graceful shutdown |
+| Development | mise, pnpm, Go tests, Vitest, Docker Compose |
+
+## Quick start
+
+Requirements: mise and Docker with Compose. Start Docker before running the development environment.
 
 ```bash
+git clone https://github.com/lucasdevco/gk.git
+cd gk
 cp .env.example .env
+mise trust
+mise install
 mise run setup
 mise run dev
 ```
 
-打开 <http://localhost:5173>。Vite 会把 `/api` 和 `/health` 代理到 `gkd`；生产构建则把 React 静态资源嵌入同一个 Go 二进制。
+Open <http://localhost:5173>. The development command starts PostgreSQL, the Go backend, and Vite. Vite proxies `/api` and `/health` to the backend on port 8080. Frontend edits reload through Vite; restart the backend after Go changes.
 
-## 常用命令
+## Commands
 
 ```bash
-mise run generate                  # sqlc + Go HTTP bindings + TypeScript SDK
-mise run build                     # dist/bin/gkd
-mise run test                      # Go + React tests
-mise run lint
-mise run format
-mise run db:migrate:new -- add_x   # 新建迁移
-mise run docker:observability      # PostgreSQL + OTel + Jaeger + Prometheus + Grafana
-mise run docker:down
+mise run generate                 # Generate SQL queries, Go bindings, and TypeScript SDK
+mise run build                    # Build the UI and dist/bin/gkd
+mise run test                     # Run Go and frontend unit tests
+mise run lint                     # Run go vet and TypeScript checks
+mise run format                   # Format Go and frontend code
+mise run ci                       # Generate, lint, test, and build
+mise run db:migrate:new -- add_x   # Create a SQL migration
+mise run docker:observability     # Start the local observability stack
+mise run docker:down              # Stop containers; retain database volume
 ```
 
-## 结构
+## Project layout
 
 ```text
-cmd/gkd                  进程入口
-internal/app             唯一组合根与生命周期
-internal/platform        配置、日志、HTTP、数据库、可观测性
-internal/task            可删除的完整业务示例
-api                      OpenAPI 合约和生成的 Go 绑定
-db/migrations            Goose 迁移（编译进二进制）
-db/queries               sqlc 查询
-web                      React 应用和生成的 TypeScript 客户端
-deploy                   Docker 与本地可观测性栈
+cmd/gkd                  Process entry point
+internal/app             Dependency assembly and application lifecycle
+internal/platform        Configuration, logging, HTTP, database, telemetry
+internal/task            Removable example business module
+api                      OpenAPI contract and generated Go bindings
+db/migrations            Embedded Goose migrations
+db/queries               SQL source for sqlc
+db/sqlc                  Generated Go query code
+web                      React app and generated TypeScript client
+deploy                   Docker and local observability configuration
 ```
 
-业务代码按领域放在 `internal/<domain>` 中。HTTP 和 PostgreSQL 是业务模块的 adapter；不要把整个项目横向拆成 `controllers/services/repositories`。
+Each business module owns its model, logic, and HTTP/storage adapters. A small repository interface separates business logic from persistence; tests can exercise it through an in-memory adapter. `internal/app` constructs dependencies and mounts routes.
 
-## 配置
+## Configuration and observability
 
-应用完全通过环境变量配置。开发环境复制 `.env.example`；生产环境由运行平台注入。不要提交 `.env`。
+Configuration comes from environment variables. mise loads `.env` for local commands; when running the binary directly, supply environment variables through your shell or deployment platform. See [.env.example](.env.example) for defaults. Database migrations run when the backend starts.
 
-设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 后，服务会导出 traces 和 metrics。日志始终写到 stdout，并自动关联请求的 `trace_id` 和 `span_id`。
+Logs go to stdout. Set `LOG_FORMAT=json` for structured output and `LOG_LEVEL` to control verbosity. Avoid logging credentials or sensitive payloads.
 
-健康检查：
+To enable telemetry locally, start `mise run docker:observability`, then add these values to `.env` and restart the backend:
 
-- `GET /health/live`：进程存活。
-- `GET /health/ready`：数据库连接可用。
+```dotenv
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_EXPORTER_OTLP_INSECURE=true
+OTEL_SERVICE_NAME=gk
+```
 
-## 添加一个业务模块
+The bundled exporter uses OTLP over gRPC. View traces in Jaeger at <http://localhost:16686>, metrics in Prometheus at <http://localhost:9090>, and Grafana at <http://localhost:3000>. Grafana data sources and dashboards must be configured separately. Logs remain on stdout; they are not exported through OTLP.
 
-1. 先在 `api/openapi.yaml` 定义接口。
-2. 创建数据库迁移，并在 `db/queries` 写查询。
-3. 运行 `mise run generate`。
-4. 在 `internal/<domain>` 中实现模型、业务逻辑和 transport/storage adapter。
-5. 在 `internal/app/app.go` 组合依赖并挂载路由。
+- `GET /health/live` reports process liveness.
+- `GET /health/ready` checks database connectivity.
 
-业务模块应返回自己的领域类型，不要向 HTTP 层泄露 sqlc 生成的数据库行类型。
+## Error handling
+
+Define domain errors in `internal/<domain>/errors.go` using `errors.New`. Preserve causes with `%w`; map expected errors with `errors.Is/As` in the HTTP adapter. Business logic does not depend on HTTP status codes.
+
+The shared HTTP helpers return `{ "error": { "code": "task_not_found", "message": "task not found" } }`, with optional `requestId` and safe `details`. HTTP status codes describe transport-level outcomes; `code` is a stable application error identifier in snake_case that clients can branch on. Multiple application codes can share an HTTP status. Unknown errors are logged with their cause and returned as HTTP 500 with `code: "internal_error"`. Never expose raw internal errors to clients.
+
+## Add a business module
+
+1. Define the contract in `api/openapi.yaml`.
+2. Add a migration and SQL queries under `db/`.
+3. Run `mise run generate`.
+4. Implement the model, business logic, and HTTP/storage adapters in `internal/<domain>`.
+5. Assemble dependencies and register routes in `internal/app/app.go`.
+6. Add the frontend feature and tests for its behavior.
+
+Keep sqlc row types inside the storage adapter. Return domain types to business callers and map them to the generated contract in the HTTP adapter.
