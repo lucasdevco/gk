@@ -40,6 +40,10 @@ func TestRouteTelemetry(t *testing.T) {
 	} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, nil))
+		spans := recorder.Ended()
+		if len(spans) == 0 || w.Header().Get("X-Trace-Id") != spans[len(spans)-1].SpanContext().TraceID().String() {
+			t.Fatalf("response trace ID does not match recorded trace: %q", w.Header().Get("X-Trace-Id"))
+		}
 		if w.Code != tc.status {
 			t.Fatalf("status=%d want=%d", w.Code, tc.status)
 		}

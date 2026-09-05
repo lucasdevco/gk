@@ -14,6 +14,9 @@ import (
 // finish, never the raw URL: IDs and query strings must not become metric labels.
 func RouteTelemetry(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if sc := trace.SpanContextFromContext(r.Context()); sc.IsValid() {
+			w.Header().Set("X-Trace-Id", sc.TraceID().String())
+		}
 		defer func() {
 			route := r.Pattern
 			if _, path, ok := strings.Cut(route, " "); ok {

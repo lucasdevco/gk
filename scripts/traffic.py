@@ -4,6 +4,7 @@
 No telemetry is fabricated and no task data is created or changed.
 Optional --demo runs order checkout scenarios with real SQL and local HTTP
 payment, rolling back all demo inventory and order writes.
+Each request prints its method, path, status, duration and response Trace ID.
 """
 import argparse
 from collections import Counter
@@ -16,6 +17,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+
+output_lock = threading.Lock()
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -49,20 +53,26 @@ def plan(sequence, phase, demo):
 
 def request(base, method, path, payload, timeout):
     started = time.monotonic()
+    trace_id = "-"
     data = None if payload is None else json.dumps(payload).encode()
     req = urllib.request.Request(base + path, data=data, method=method,
                                  headers={"Content-Type": "application/json"})
     try:
         with urllib.request.build_opener(NoRedirect()).open(req, timeout=timeout) as response:
+            trace_id = response.headers.get("X-Trace-Id") or "-"
             while response.read(65536):
                 pass
             status = response.status
     except urllib.error.HTTPError as error:
         status = error.code
+        trace_id = error.headers.get("X-Trace-Id") or "-"
         error.close()
     except (OSError, urllib.error.URLError):
         status = "network_error"
-    return status, time.monotonic() - started
+    duration = time.monotonic() - started
+    with output_lock:
+        print(f"{method} {path} status={status} duration_ms={duration * 1000:.1f} trace_id={trace_id}", flush=True)
+    return status, duration
 
 
 def main():
