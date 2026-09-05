@@ -10,12 +10,14 @@ import (
 func TestDocumentationRoutes(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterDocs(mux)
+	// Match the application mounting: docs must take precedence over the API handler.
+	mux.Handle("/api/", http.NotFoundHandler())
 	for _, tc := range []struct {
 		path, contentType string
 		content           []byte
 	}{
-		{"/openapi.yaml", "application/yaml; charset=utf-8", specification},
-		{"/docs", "text/html; charset=utf-8", []byte("url: '/openapi.yaml'")},
+		{"/api/openapi.yaml", "application/yaml; charset=utf-8", specification},
+		{"/api/docs", "text/html; charset=utf-8", []byte("url: '/api/openapi.yaml'")},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			w := httptest.NewRecorder()

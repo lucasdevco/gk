@@ -44,7 +44,7 @@ Open <http://localhost:5173>. The development command starts PostgreSQL, the Go 
 
 ## Commands
 
-Interactive API documentation is available at <http://localhost:8080/docs>, with the raw contract at <http://localhost:8080/openapi.yaml>. Both paths also work through the Vite development server on port 5173. Swagger UI supports trying requests against the same origin. Its pinned JavaScript and CSS assets load from unpkg and require internet access; the OpenAPI contract is embedded in the binary and served locally.
+Interactive API documentation is available at <http://localhost:8080/api/docs>, with the raw contract at <http://localhost:8080/api/openapi.yaml>. Both paths also work through the Vite development server on port 5173. Swagger UI supports trying requests against the same origin. Its pinned JavaScript and CSS assets load from unpkg and require internet access; the OpenAPI contract is embedded in the binary and served locally.
 
 ```bash
 mise run generate                 # Generate SQL queries, Go bindings, and TypeScript SDK
