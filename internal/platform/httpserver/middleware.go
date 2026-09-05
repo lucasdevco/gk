@@ -14,15 +14,6 @@ type contextKey string
 
 const requestIDKey contextKey = "request_id"
 
-type Middleware func(http.Handler) http.Handler
-
-func Chain(handler http.Handler, middleware ...Middleware) http.Handler {
-	for i := len(middleware) - 1; i >= 0; i-- {
-		handler = middleware[i](handler)
-	}
-	return handler
-}
-
 func RequestID(ctx context.Context) string {
 	value, _ := ctx.Value(requestIDKey).(string)
 	return value
@@ -39,53 +30,47 @@ func WithRequestID(next http.Handler) http.Handler {
 	})
 }
 
-func Recover(logger *slog.Logger) Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer func() {
-				if value := recover(); value != nil {
-					logger.ErrorContext(r.Context(), "panic recovered", "panic", value, "stack", string(debug.Stack()))
-					WriteError(w, r, http.StatusInternalServerError, "internal_error", "internal server error")
-				}
-			}()
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-func AccessLog(logger *slog.Logger) Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			started := time.Now()
-			response := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-			next.ServeHTTP(response, r)
-			logger.InfoContext(r.Context(), "http request",
-				"method", r.Method,
-				"path", r.URL.Path,
-				"status", response.status,
-				"bytes", response.bytes,
-				"duration_ms", time.Since(started).Milliseconds(),
-				"request_id", RequestID(r.Context()),
-			)
-		})
-	}
-}
-
-func CORS(origin string) Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
-			w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID, X-Trace-Id, Server-Timing")
-			w.Header().Set("Timing-Allow-Origin", origin)
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
-				return
+func Recover(next http.Handler, logger *slog.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if value := recover(); value != nil {
+				logger.ErrorContext(r.Context(), "panic recovered", "panic", value, "stack", string(debug.Stack()))
+				WriteError(w, r, http.StatusInternalServerError, "internal_error", "internal server error")
 			}
-			next.ServeHTTP(w, r)
-		})
-	}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func AccessLog(next http.Handler, logger *slog.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+		response := &responseWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(response, r)
+		logger.InfoContext(r.Context(), "http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", response.status,
+			"bytes", response.bytes,
+			"duration_ms", time.Since(started).Milliseconds(),
+			"request_id", RequestID(r.Context()),
+		)
+	})
+}
+
+func CORS(next http.Handler, origin string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+		w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID, X-Trace-Id, Server-Timing")
+		w.Header().Set("Timing-Allow-Origin", origin)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 type responseWriter struct {

@@ -32,7 +32,9 @@ func TestServerTiming(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			handler := Chain(tc.handler, ServerTiming, Recover(logger), CORS("https://example.com"))
+			handler := CORS(tc.handler, "https://example.com")
+			handler = Recover(handler, logger)
+			handler = ServerTiming(handler)
 			response := httptest.NewRecorder()
 			response.Header().Add("Server-Timing", "db;dur=1")
 			handler.ServeHTTP(response, httptest.NewRequest("GET", "/", nil))

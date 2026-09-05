@@ -88,14 +88,16 @@ func routes(database *pgxpool.Pool, logger *slog.Logger, publicURL string, demo 
 	})
 	mux.Handle("/", web.Handler())
 
-	return otelhttp.NewHandler(httpserver.Chain(mux,
-		httpserver.WithRequestID,
-		httpserver.ServerTiming,
-		httpserver.Recover(logger),
-		httpserver.AccessLog(logger),
-		httpserver.CORS(publicURL),
-		httpserver.RouteTelemetry,
-	), "http.server")
+	// Wrap from the inside out; the last wrapper handles the request first.
+	// Request order: OTel → RequestID → ServerTiming → Recover → AccessLog → CORS → RouteTelemetry → mux.
+	var handler http.Handler = mux
+	handler = httpserver.RouteTelemetry(handler)
+	handler = httpserver.CORS(handler, publicURL)
+	handler = httpserver.AccessLog(handler, logger)
+	handler = httpserver.Recover(handler, logger)
+	handler = httpserver.ServerTiming(handler)
+	handler = httpserver.WithRequestID(handler)
+	return otelhttp.NewHandler(handler, "http.server")
 }
 
 // apiHandlers assembles independent modules behind the generated contract.

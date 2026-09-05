@@ -27,7 +27,10 @@ func TestRouteTelemetry(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", inner)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler := otelhttp.NewHandler(Chain(mux, WithRequestID, Recover(logger), RouteTelemetry), "http.server", otelhttp.WithMeterProvider(mp), otelhttp.WithTracerProvider(tp))
+	handler := RouteTelemetry(mux)
+	handler = Recover(handler, logger)
+	handler = WithRequestID(handler)
+	handler = otelhttp.NewHandler(handler, "http.server", otelhttp.WithMeterProvider(mp), otelhttp.WithTracerProvider(tp))
 	for _, tc := range []struct {
 		method, path string
 		status       int
