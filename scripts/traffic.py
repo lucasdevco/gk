@@ -2,7 +2,8 @@
 """Generate bounded real HTTP traffic: normal → mixed client errors → recovery.
 
 No telemetry is fabricated and no task data is created or changed.
-Optional --demo exercises development-only latency/retry scenarios separately.
+Optional --demo runs order checkout scenarios with real SQL and local HTTP
+payment, rolling back all demo inventory and order writes.
 """
 import argparse
 from collections import Counter
@@ -23,18 +24,25 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def plan(sequence, phase, demo):
+    if demo:
+        scenario, body = "normal", {"quantity": sequence % 3 + 1}
+        if phase == "mixed":
+            pick = sequence % 10
+            if pick == 0:
+                scenario, body = "slow-payment", {"delayMs": 800, "quantity": 2}
+            elif pick == 1:
+                scenario, body = "payment-retry", {"failuresBeforeSuccess": 2}
+            elif pick == 2:
+                scenario = "out-of-stock"
+            elif pick == 3:
+                scenario = "payment-declined"
+        return "POST", f"/api/v1/demo/orders/{scenario}", body
     if phase != "mixed":
         return "GET", "/api/v1/tasks", None
     pick = sequence % 10
-    if demo and pick == 0:
-        return "POST", "/api/v1/observability/scenarios/slow-dependency/run", {"delayMs": 800}
-    if demo and pick == 1:
-        return "POST", "/api/v1/observability/scenarios/retry/run", {"failuresBeforeSuccess": 2}
     if pick in (2, 3):
-        # Empty titles fail validation before storage.
         return "POST", "/api/v1/tasks", {"title": ""}
     if pick == 4:
-        # Intentionally invalid UUID: cannot match or mutate a stored task.
         return "PATCH", f"/api/v1/tasks/load-missing-{sequence}", {"completed": True}
     return "GET", "/api/v1/tasks", None
 
@@ -63,7 +71,7 @@ def main():
     parser.add_argument("--duration", type=int, default=180, help="total seconds (3–1800)")
     parser.add_argument("--rate", type=float, default=10, help="total target requests/s (0–100]")
     parser.add_argument("--concurrency", type=int, default=4, help="in-flight limit (1–32)")
-    parser.add_argument("--demo", action="store_true", help="include dev-only slow/retry requests")
+    parser.add_argument("--demo", action="store_true", help="run dev-only order checkouts, slow payments, retries and business rejections")
     args = parser.parse_args()
     url = urllib.parse.urlsplit(args.url)
     if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password or url.query or url.fragment:
@@ -74,7 +82,7 @@ def main():
         parser.error("invalid duration, rate or concurrency")
     base = args.url.rstrip("/")
     if args.demo:
-        status, _ = request(base, "POST", "/api/v1/observability/scenarios/baseline/run", {}, 5)
+        status, _ = request(base, "POST", "/api/v1/demo/orders/normal", {}, 5)
         if status != 200:
             parser.error("--demo requires a reachable API with APP_ENV=development")
     stopped = threading.Event()

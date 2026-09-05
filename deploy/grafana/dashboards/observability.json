@@ -1,6 +1,6 @@
 {
   "uid": "gk-observability",
-  "title": "GK Observability Demo",
+  "title": "GK Order Checkout Demo",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "5s",
@@ -14,7 +14,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Completed runs / second",
+      "title": "Order checkouts / second",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -42,7 +42,7 @@
     },
     {
       "id": 2,
-      "title": "Scenario p95 duration",
+      "title": "Checkout p95 duration",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -70,7 +70,7 @@
     },
     {
       "id": 3,
-      "title": "Dependency attempts / second",
+      "title": "Payment attempts / second",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -98,7 +98,7 @@
     },
     {
       "id": 4,
-      "title": "Failed attempt ratio",
+      "title": "Payment failed attempt ratio",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -126,7 +126,7 @@
     },
     {
       "id": 5,
-      "title": "Completed runs since process start",
+      "title": "Checkout outcomes since process start",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -154,7 +154,7 @@
     },
     {
       "id": 6,
-      "title": "Dependency attempts since process start",
+      "title": "Payment attempts since process start",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -180,5 +180,6 @@
         "overrides": []
       }
     }
-  ]
+  ],
+  "description": "Real PostgreSQL order and inventory operations with a loopback HTTP payment simulator. Every transaction rolls back; no real payment is made."
 }

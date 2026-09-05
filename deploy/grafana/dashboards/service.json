@@ -103,7 +103,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval]))",
+          "expr": "sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval]))",
           "legendFormat": "{{http_request_method}} {{http_route}}",
           "interval": "1m"
         }
@@ -134,19 +134,19 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "interval": "1m"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "interval": "1m"
         },
         {
           "refId": "C",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "interval": "1m"
         }
@@ -177,7 +177,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\",http_response_status_code=~\"5..\"}[$__rate_interval])) or (0 * sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])))) / (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])) > 0)",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\",http_response_status_code=~\"5..\"}[$__rate_interval])) or (0 * sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])))) / (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])) > 0)",
           "legendFormat": "5xx",
           "interval": "1m"
         }
@@ -208,7 +208,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\",http_response_status_code=~\"4..\"}[$__rate_interval])) or (0 * sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])))) / (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])) > 0)",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\",http_response_status_code=~\"4..\"}[$__rate_interval])) or (0 * sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])))) / (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])) > 0)",
           "legendFormat": "4xx",
           "interval": "1m"
         }
@@ -239,7 +239,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval]))",
+          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval]))",
           "legendFormat": "{{http_response_status_code}}",
           "interval": "1m"
         }
@@ -270,7 +270,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le,http_route,http_request_method) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/observability/.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le,http_route,http_request_method) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\",deployment_environment=~\"$environment\",instance=~\"$instance\",http_route!~\"/health/.*|/api/v1/(demo|observability)/.*\"}[$__rate_interval])))",
           "legendFormat": "{{http_request_method}} {{http_route}}",
           "interval": "1m"
         }

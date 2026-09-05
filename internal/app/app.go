@@ -52,10 +52,17 @@ func Run(ctx context.Context) error {
 	}
 	defer database.Close()
 
-	demo, err := observabilitydemo.New(logger, cfg.Environment)
+	demo, err := observabilitydemo.New(logger, cfg.Environment, database)
 	if err != nil {
 		return fmt.Errorf("initialize observability demo: %w", err)
 	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := demo.Close(closeCtx); err != nil {
+			logger.Warn("close demo payment server", "error", err)
+		}
+	}()
 	handler := routes(database, logger, cfg.PublicURL, demo)
 	server := httpserver.New(cfg.Addr, handler, logger, cfg.ShutdownTimeout)
 	return server.Run(ctx)

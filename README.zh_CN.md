@@ -84,9 +84,9 @@ deploy                   Docker 与本地可观测性配置
 
 可观测性按需启用：执行 `mise run docker:observability`，将 `.env.example` 中注释的本地 `OTEL_*` 配置启用到 `.env`，再重启 API。`mise run dev` 除 API 和 Vite 外只自动启动 PostgreSQL。
 
-内置导出器使用 OTLP over gRPC。通过 <http://localhost:16686> 的 Jaeger 查看 Trace，通过 <http://localhost:9090> 的 Prometheus 查看指标，Grafana 位于 <http://localhost:3000>。本地 Grafana 无需登录即可使用组织管理员权限，仅监听 127.0.0.1。Grafana 自动配置 Prometheus、Jaeger 数据源和 GK Observability Demo 仪表盘。日志保留在 stdout，不通过 OTLP 导出。
+内置导出器使用 OTLP over gRPC。通过 <http://localhost:16686> 的 Jaeger 查看 Trace，通过 <http://localhost:9090> 的 Prometheus 查看指标，Grafana 位于 <http://localhost:3000>。本地 Grafana 无需登录即可使用组织管理员权限，仅监听 127.0.0.1。Grafana 自动配置 Prometheus、Jaeger 数据源和 GK Order Checkout Demo 仪表盘。日志保留在 stdout，不通过 OTLP 导出。
 
-开发环境中，在 [API 文档](http://localhost:8080/api/docs) 选择 `baseline`、`slow-dependency` 或 `retry`，发送 `{}` 即可演示。在 [Grafana 仪表盘](http://localhost:3000/d/gk-observability) 查看指标，将响应的 `traceId` 粘贴到 Jaeger 查看调用链。指标约需等待 20–30 秒。
+开发环境中，在 [API 文档](http://localhost:8080/api/docs) 演示下单：真实 PostgreSQL 创建订单 → 扣库存 → 本地 HTTP 模拟支付 → 确认订单。场景为 `normal`、`slow-payment`（支付慢）、`payment-retry`、`out-of-stock`（409）、`payment-declined`（422），发送 `{}` 或 `{"quantity":2}`。每次使用独立测试库存，成功或失败都回滚，支付不会真实扣款；事务布局仅用于隔离演示，不是生产支付架构。在 [订单仪表盘](http://localhost:3000/d/gk-observability) 查看指标，通过 `traceId` 在 Jaeger 中查看完整链路。`python3 scripts/traffic.py --demo` 可批量生成这些订单流程。
 
 响应包含 `Server-Timing: app;dur=<毫秒>`，统计后端处理至最终响应头发送前的耗时，不包含响应体传输。已有计时指标会保留。配置的 CORS 来源可以读取此响应头，并访问浏览器性能计时信息。
 
@@ -112,4 +112,4 @@ deploy                   Docker 与本地可观测性配置
 
 生产服务指标见 [GK Service Overview](http://localhost:3000/d/gk-service)：按服务、环境、实例筛选 HTTP 请求量、4xx/5xx、P95/P99、Go 内存及数据库连接池。HTTP 面板排除健康检查和演示流量，使用至少 4 分钟的速率窗口以适配默认 60 秒导出。多实例启动时自动生成 `service.instance.id`，也可通过 `OTEL_RESOURCE_ATTRIBUTES` 设置。接入自己的 Collector 时保留 `deploy/otel-collector.yaml` 的服务/环境标签映射；Prometheus 抓取启用 `honor_labels`。这是可复用的服务监控面板，本地匿名 Grafana Compose 配置不用于生产部署。
 
-造数据：启动服务并启用遥测后，执行 `python3 scripts/traffic.py --duration 180 --rate 10`。脚本按正常 → 4xx 错误 → 恢复三个阶段发送真实请求，不创建或修改业务数据；`--url` 指定地址，`--concurrency` 限制并发，`--demo` 额外产生开发演示场景的数据。默认 60 秒导出时可运行 `--duration 600`，让每个阶段覆盖多个导出周期。脚本不伪造 5xx；数据库不可用等真实故障才会让服务端错误率上升。
+造数据：启动服务并启用遥测后，执行 `python3 scripts/traffic.py --duration 180 --rate 10`。脚本按正常 → 4xx 错误 → 恢复三个阶段发送真实请求，不创建或修改任务数据；`--url` 指定地址，`--concurrency` 限制并发，`--demo` 切换为隔离的订单业务演示。默认 60 秒导出时可运行 `--duration 600`，让每个阶段覆盖多个导出周期。默认模式不伪造 5xx；数据库不可用等真实故障才会让服务端错误率上升。

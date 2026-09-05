@@ -5,18 +5,18 @@ info:
 servers:
   - url: /
 paths:
-  /api/v1/observability/scenarios/{scenario}/run:
+  /api/v1/demo/orders/{scenario}:
     post:
-      operationId: runObservabilityScenario
+      operationId: runDemoOrder
       summary: Run a bounded development-only observability demonstration
-      description: Available only when APP_ENV=development. No external dependencies or database writes. At most four concurrent runs per process.
+      description: Available only when APP_ENV=development. Runs an order checkout with real PostgreSQL writes in an isolated transaction that is always rolled back. Payment uses a local HTTP simulator; no real charge occurs. At most four concurrent runs per process.
       parameters:
         - name: scenario
           in: path
           required: true
           schema:
             type: string
-          description: One of baseline, slow-dependency, or retry. Unknown names return 404.
+          description: One of normal, slow-payment, payment-retry, out-of-stock, or payment-declined. Unknown names return 404.
       requestBody:
         required: true
         content:
@@ -39,6 +39,12 @@ paths:
         "400":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
           $ref: "#/components/responses/Error"
         "408":
           $ref: "#/components/responses/Error"
@@ -128,22 +134,49 @@ components:
       type: object
       additionalProperties: false
       properties:
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+          description: Demo product quantity; unit price is 1990 cents, initial stock is 10.
         delayMs:
           type: integer
           minimum: 0
           maximum: 3000
           default: 1500
-          description: Only accepted by slow-dependency; delay in the simulated dependency.
+          description: Only accepted by slow-payment; delay in the local payment HTTP service.
         failuresBeforeSuccess:
           type: integer
           minimum: 0
           maximum: 3
           default: 2
-          description: Only accepted by retry; failed attempts before eventual success.
+          description: Only accepted by payment-retry; failed attempts before eventual success.
+    DemoOrder:
+      type: object
+      required: [id, quantity, totalCents, status, stockRemaining, rolledBack]
+      properties:
+        id:
+          type: string
+          description: Temporary demo order ID; cannot be retrieved after rollback.
+        quantity:
+          type: integer
+        totalCents:
+          type: integer
+        status:
+          type: string
+          enum: [paid]
+        stockRemaining:
+          type: integer
+        rolledBack:
+          type: boolean
+          description: Always true on success; neither order nor stock changes persist.
     ObservabilityScenarioResult:
       type: object
-      required: [scenario, outcome, attempts, durationMs]
+      required: [scenario, outcome, attempts, durationMs, order]
       properties:
+        order:
+          $ref: "#/components/schemas/DemoOrder"
         scenario:
           type: string
         outcome:

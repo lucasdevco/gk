@@ -13,6 +13,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for DemoOrderStatus.
+const (
+	Paid DemoOrderStatus = "paid"
+)
+
+// Valid indicates whether the value is a known member of the DemoOrderStatus enum.
+func (e DemoOrderStatus) Valid() bool {
+	switch e {
+	case Paid:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ObservabilityScenarioResultOutcome.
 const (
 	Success ObservabilityScenarioResultOutcome = "success"
@@ -27,6 +42,22 @@ func (e ObservabilityScenarioResultOutcome) Valid() bool {
 		return false
 	}
 }
+
+// DemoOrder defines model for DemoOrder.
+type DemoOrder struct {
+	// Id Temporary demo order ID; cannot be retrieved after rollback.
+	Id       string `json:"id"`
+	Quantity int    `json:"quantity"`
+
+	// RolledBack Always true on success; neither order nor stock changes persist.
+	RolledBack     bool            `json:"rolledBack"`
+	Status         DemoOrderStatus `json:"status"`
+	StockRemaining int             `json:"stockRemaining"`
+	TotalCents     int             `json:"totalCents"`
+}
+
+// DemoOrderStatus defines model for DemoOrder.Status.
+type DemoOrderStatus string
 
 // Error defines model for Error.
 type Error struct {
@@ -43,17 +74,21 @@ type Error struct {
 
 // ObservabilityScenarioRequest defines model for ObservabilityScenarioRequest.
 type ObservabilityScenarioRequest struct {
-	// DelayMs Only accepted by slow-dependency; delay in the simulated dependency.
+	// DelayMs Only accepted by slow-payment; delay in the local payment HTTP service.
 	DelayMs *int `json:"delayMs,omitempty"`
 
-	// FailuresBeforeSuccess Only accepted by retry; failed attempts before eventual success.
+	// FailuresBeforeSuccess Only accepted by payment-retry; failed attempts before eventual success.
 	FailuresBeforeSuccess *int `json:"failuresBeforeSuccess,omitempty"`
+
+	// Quantity Demo product quantity; unit price is 1990 cents, initial stock is 10.
+	Quantity *int `json:"quantity,omitempty"`
 }
 
 // ObservabilityScenarioResult defines model for ObservabilityScenarioResult.
 type ObservabilityScenarioResult struct {
 	Attempts   int                                `json:"attempts"`
 	DurationMs int64                              `json:"durationMs"`
+	Order      DemoOrder                          `json:"order"`
 	Outcome    ObservabilityScenarioResultOutcome `json:"outcome"`
 	Scenario   string                             `json:"scenario"`
 
@@ -83,8 +118,8 @@ type UpdateTaskJSONBody struct {
 	Completed bool `json:"completed"`
 }
 
-// RunObservabilityScenarioJSONRequestBody defines body for RunObservabilityScenario for application/json ContentType.
-type RunObservabilityScenarioJSONRequestBody = ObservabilityScenarioRequest
+// RunDemoOrderJSONRequestBody defines body for RunDemoOrder for application/json ContentType.
+type RunDemoOrderJSONRequestBody = ObservabilityScenarioRequest
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody CreateTaskJSONBody
@@ -95,8 +130,8 @@ type UpdateTaskJSONRequestBody UpdateTaskJSONBody
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Run a bounded development-only observability demonstration
-	// (POST /api/v1/observability/scenarios/{scenario}/run)
-	RunObservabilityScenario(w http.ResponseWriter, r *http.Request, scenario string)
+	// (POST /api/v1/demo/orders/{scenario})
+	RunDemoOrder(w http.ResponseWriter, r *http.Request, scenario string)
 	// List tasks
 	// (GET /api/v1/tasks)
 	ListTasks(w http.ResponseWriter, r *http.Request)
@@ -117,8 +152,8 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// RunObservabilityScenario operation middleware
-func (siw *ServerInterfaceWrapper) RunObservabilityScenario(w http.ResponseWriter, r *http.Request) {
+// RunDemoOrder operation middleware
+func (siw *ServerInterfaceWrapper) RunDemoOrder(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -133,7 +168,7 @@ func (siw *ServerInterfaceWrapper) RunObservabilityScenario(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RunObservabilityScenario(w, r, scenario)
+		siw.Handler.RunDemoOrder(w, r, scenario)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -317,7 +352,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/observability/scenarios/{scenario}/run", wrapper.RunObservabilityScenario)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/demo/orders/{scenario}", wrapper.RunDemoOrder)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/tasks", wrapper.ListTasks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/tasks", wrapper.CreateTask)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/tasks/{id}", wrapper.UpdateTask)

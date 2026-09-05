@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -19,6 +21,8 @@ import (
 )
 
 type Handler struct {
+	begin    func(context.Context) (pgx.Tx, error)
+	payment  *paymentSimulator
 	enabled  bool
 	logger   *slog.Logger
 	slots    chan struct{}
@@ -28,7 +32,7 @@ type Handler struct {
 	duration metric.Float64Histogram
 }
 
-func New(logger *slog.Logger, environment string) (*Handler, error) {
+func New(logger *slog.Logger, environment string, pool *pgxpool.Pool) (*Handler, error) {
 	h := &Handler{enabled: environment == "development", logger: logger, slots: make(chan struct{}, 4), tracer: otel.Tracer("gk/observabilitydemo")}
 	meter := otel.Meter("gk/observabilitydemo")
 	var err error
@@ -41,15 +45,34 @@ func New(logger *slog.Logger, environment string) (*Handler, error) {
 		return nil, err
 	}
 	h.duration, err = meter.Float64Histogram("gk.demo.duration", metric.WithUnit("s"), metric.WithExplicitBucketBoundaries(.01, .05, .1, .25, .5, 1, 2, 4))
-	return h, err
+	if err != nil {
+		return nil, err
+	}
+	if h.enabled {
+		if pool != nil {
+			h.begin = pool.Begin
+		}
+		h.payment, err = startPaymentSimulator(logger)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return h, nil
 }
 
-func (h *Handler) RunObservabilityScenario(w http.ResponseWriter, r *http.Request, scenario string) {
+func (h *Handler) Close(ctx context.Context) error {
+	if h.payment == nil {
+		return nil
+	}
+	return h.payment.close(ctx)
+}
+
+func (h *Handler) RunDemoOrder(w http.ResponseWriter, r *http.Request, scenario string) {
 	if !h.enabled {
 		httpserver.WriteError(w, r, 404, "demo_disabled", "observability demonstrations are disabled")
 		return
 	}
-	if scenario != "baseline" && scenario != "slow-dependency" && scenario != "retry" {
+	if scenario != "normal" && scenario != "slow-payment" && scenario != "payment-retry" && scenario != "out-of-stock" && scenario != "payment-declined" {
 		httpserver.WriteError(w, r, 404, "scenario_not_found", "unknown observability scenario")
 		return
 	}
@@ -58,17 +81,20 @@ func (h *Handler) RunObservabilityScenario(w http.ResponseWriter, r *http.Reques
 		httpserver.WriteError(w, r, 400, "invalid_request", "expected a JSON object")
 		return
 	}
-	delay, failures := 1500, 2
+	delay, failures, quantity := 1500, 2, 1
+	if body.Quantity != nil {
+		quantity = *body.Quantity
+	}
 	if body.DelayMs != nil {
 		delay = *body.DelayMs
 	}
 	if body.FailuresBeforeSuccess != nil {
 		failures = *body.FailuresBeforeSuccess
 	}
-	if delay < 0 || delay > 3000 || failures < 0 || failures > 3 ||
-		(body.DelayMs != nil && scenario != "slow-dependency") ||
-		(body.FailuresBeforeSuccess != nil && scenario != "retry") {
-		httpserver.WriteError(w, r, 400, "invalid_request", "delayMs (0–3000) is only for slow-dependency; failuresBeforeSuccess (0–3) is only for retry")
+	if quantity < 1 || quantity > 10 || delay < 0 || delay > 3000 || failures < 0 || failures > 3 ||
+		(body.DelayMs != nil && scenario != "slow-payment") ||
+		(body.FailuresBeforeSuccess != nil && scenario != "payment-retry") {
+		httpserver.WriteError(w, r, 400, "invalid_request", "quantity must be 1–10; delayMs (0–3000) is only for slow-payment; failuresBeforeSuccess (0–3) is only for payment-retry")
 		return
 	}
 	select {
@@ -78,7 +104,9 @@ func (h *Handler) RunObservabilityScenario(w http.ResponseWriter, r *http.Reques
 		httpserver.WriteError(w, r, 429, "demo_busy", "four demonstrations are already running")
 		return
 	}
-	ctx, span := h.tracer.Start(r.Context(), "demo.run", trace.WithAttributes(attribute.String("scenario", scenario)))
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	ctx, span := h.tracer.Start(ctx, "demo.run", trace.WithAttributes(attribute.String("scenario", scenario)))
 	defer span.End()
 	traceID := ""
 	if sc := span.SpanContext(); sc.IsValid() {
@@ -93,67 +121,40 @@ func (h *Handler) RunObservabilityScenario(w http.ResponseWriter, r *http.Reques
 		h.duration.Record(ctx, time.Since(started).Seconds(), attrs)
 		h.logger.InfoContext(ctx, "demo completed", "scenario", scenario, "outcome", outcome, "duration_ms", time.Since(started).Milliseconds())
 	}()
-	count := 0
-	err := h.step(ctx, "demo.validate", 10*time.Millisecond)
-	if err == nil {
-		wait := 20 * time.Millisecond
-		if scenario == "slow-dependency" {
-			wait = time.Duration(delay) * time.Millisecond
-		}
-		if scenario != "retry" {
-			failures = 0
-		}
-		for count = 1; count <= failures+1; count++ {
-			attemptCtx, attemptSpan := h.tracer.Start(ctx, "demo.dependency", trace.WithAttributes(attribute.Int("attempt", count), attribute.Bool("simulated", true)))
-			err = pause(attemptCtx, wait)
-			result := "success"
-			if err == nil && count <= failures {
-				err = errors.New("simulated dependency unavailable")
-			}
-			if err != nil {
-				result = "error"
-				attemptSpan.RecordError(err)
-				attemptSpan.SetStatus(codes.Error, "dependency attempt failed")
-				h.logger.WarnContext(attemptCtx, "demo dependency failed", "scenario", scenario, "attempt", count, "error", err)
-			}
-			h.attempts.Add(attemptCtx, 1, metric.WithAttributes(attribute.String("scenario", scenario), attribute.String("outcome", result)))
-			attemptSpan.End()
-			if ctx.Err() != nil {
-				err = ctx.Err()
-				break
-			}
-			if err == nil {
-				break
-			}
-			if err = h.step(ctx, "demo.backoff", 100*time.Millisecond); err != nil {
-				break
-			}
-		}
-	}
-	if err == nil {
-		err = h.step(ctx, "demo.render", 10*time.Millisecond)
-	}
+	order, count, err := h.checkout(ctx, scenario, quantity, delay, failures)
 	if err != nil {
-		outcome = "canceled"
+		outcome = "error"
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "demonstration canceled")
-		httpserver.WriteError(w, r, http.StatusRequestTimeout, "demo_canceled", "demonstration canceled")
+		span.SetStatus(codes.Error, "checkout failed")
+		status, code, message := http.StatusServiceUnavailable, "checkout_unavailable", "checkout dependencies are unavailable"
+		switch {
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			outcome = "canceled"
+			status, code, message = http.StatusRequestTimeout, "demo_canceled", "checkout canceled"
+		case errors.Is(err, errOutOfStock):
+			status, code, message = http.StatusConflict, "out_of_stock", "not enough inventory"
+		case errors.Is(err, errPaymentDeclined):
+			status, code, message = http.StatusUnprocessableEntity, "payment_declined", "simulated payment was declined"
+		}
+		h.logger.WarnContext(ctx, "order checkout failed", "scenario", scenario, "error", err)
+		httpserver.WriteError(w, r, status, code, message)
 		return
 	}
-	result := api.ObservabilityScenarioResult{Scenario: scenario, Outcome: api.Success, Attempts: count, DurationMs: time.Since(started).Milliseconds()}
+	result := api.ObservabilityScenarioResult{Scenario: scenario, Outcome: api.Success, Attempts: count, DurationMs: time.Since(started).Milliseconds(), Order: api.DemoOrder{Id: order.ID, Quantity: order.Quantity, TotalCents: order.TotalCents, Status: api.Paid, StockRemaining: order.StockRemaining, RolledBack: order.RolledBack}}
 	if traceID != "" {
 		result.TraceId = &traceID
 	}
 	httpserver.WriteJSON(w, http.StatusOK, result)
 }
 
-func (h *Handler) step(ctx context.Context, name string, duration time.Duration) error {
+// step measures real business/database operations without recording SQL or payloads.
+func (h *Handler) step(ctx context.Context, name string, run func(context.Context) error) error {
 	ctx, span := h.tracer.Start(ctx, name)
 	defer span.End()
-	err := pause(ctx, duration)
+	err := run(ctx)
 	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "step canceled")
+		span.SetStatus(codes.Error, "operation failed")
 	}
 	return err
 }

@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+type DemoInventory struct {
+	ID        string `json:"id"`
+	Available int32  `json:"available"`
+}
+
+type DemoOrder struct {
+	ID          string `json:"id"`
+	InventoryID string `json:"inventory_id"`
+	Quantity    int32  `json:"quantity"`
+	TotalCents  int32  `json:"total_cents"`
+	Status      string `json:"status"`
+}
+
 type Task struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
