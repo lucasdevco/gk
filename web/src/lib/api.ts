@@ -1,4 +1,4 @@
-import type { Task } from "./api-client/types.gen";
+import type { Task, Error as ErrorResponse } from "./api-client/types.gen";
 
 type TaskList = { items: Task[] };
 
@@ -8,9 +8,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
+    const body = (await response
+      .json()
+      .catch(() => null)) as ErrorResponse | null;
     throw new Error(
       body?.error?.message ?? `Request failed (${response.status})`,
     );

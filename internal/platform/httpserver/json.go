@@ -27,14 +27,3 @@ func WriteJSON(w http.ResponseWriter, status int, value any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
-
-func WriteError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	payload := map[string]any{
-		"error": map[string]string{
-			"code":      code,
-			"message":   message,
-			"requestId": RequestID(r.Context()),
-		},
-	}
-	WriteJSON(w, status, payload)
-}

@@ -21,7 +21,7 @@ func NewHTTPHandler(service *Service, logger *slog.Logger) *HTTPHandler {
 func (h *HTTPHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	tasks, err := h.service.List(r.Context())
 	if err != nil {
-		h.internalError(w, r, err)
+		h.writeError(w, r, err)
 		return
 	}
 	items := make([]api.Task, len(tasks))
@@ -34,16 +34,12 @@ func (h *HTTPHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 func (h *HTTPHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var body api.CreateTaskJSONRequestBody
 	if err := httpserver.DecodeJSON(w, r, &body); err != nil {
-		httpserver.WriteError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		httpserver.WriteError(w, r, http.StatusBadRequest, "invalid_request", "invalid JSON request body")
 		return
 	}
 	created, err := h.service.Create(r.Context(), body.Title)
-	if errors.Is(err, ErrInvalidTitle) {
-		httpserver.WriteError(w, r, http.StatusBadRequest, "invalid_title", err.Error())
-		return
-	}
 	if err != nil {
-		h.internalError(w, r, err)
+		h.writeError(w, r, err)
 		return
 	}
 	httpserver.WriteJSON(w, http.StatusCreated, toAPI(created))
@@ -52,24 +48,26 @@ func (h *HTTPHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 func (h *HTTPHandler) UpdateTask(w http.ResponseWriter, r *http.Request, id string) {
 	var body api.UpdateTaskJSONRequestBody
 	if err := httpserver.DecodeJSON(w, r, &body); err != nil {
-		httpserver.WriteError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		httpserver.WriteError(w, r, http.StatusBadRequest, "invalid_request", "invalid JSON request body")
 		return
 	}
 	updated, err := h.service.SetCompleted(r.Context(), id, body.Completed)
-	if errors.Is(err, ErrNotFound) {
-		httpserver.WriteError(w, r, http.StatusNotFound, "task_not_found", err.Error())
-		return
-	}
 	if err != nil {
-		h.internalError(w, r, err)
+		h.writeError(w, r, err)
 		return
 	}
 	httpserver.WriteJSON(w, http.StatusOK, toAPI(updated))
 }
 
-func (h *HTTPHandler) internalError(w http.ResponseWriter, r *http.Request, err error) {
-	h.logger.ErrorContext(r.Context(), "task request failed", "error", err)
-	httpserver.WriteError(w, r, http.StatusInternalServerError, "internal_error", "internal server error")
+func (h *HTTPHandler) writeError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, ErrInvalidTitle):
+		httpserver.WriteError(w, r, http.StatusBadRequest, "task_invalid_title", ErrInvalidTitle.Error())
+	case errors.Is(err, ErrNotFound):
+		httpserver.WriteError(w, r, http.StatusNotFound, "task_not_found", "task not found")
+	default:
+		httpserver.WriteInternalError(w, r, h.logger, err)
+	}
 }
 
 func toAPI(value Task) api.Task {

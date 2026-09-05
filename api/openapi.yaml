@@ -111,6 +111,12 @@ components:
           properties:
             code:
               type: string
+              description: Stable application error code, independent of the HTTP status code.
+              example: task_not_found
+            details:
+              type: object
+              additionalProperties: true
+              description: Safe machine-readable context; keys use snake_case.
             message:
               type: string
             requestId:

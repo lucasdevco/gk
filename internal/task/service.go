@@ -3,16 +3,10 @@ package task
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-)
-
-var (
-	ErrInvalidTitle = errors.New("task title must contain between 1 and 200 characters")
-	ErrNotFound     = errors.New("task not found")
 )
 
 type Task struct {

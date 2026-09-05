@@ -16,9 +16,13 @@ import (
 // Error defines model for Error.
 type Error struct {
 	Error struct {
-		Code      string  `json:"code"`
-		Message   string  `json:"message"`
-		RequestId *string `json:"requestId,omitempty"`
+		// Code Stable application error code, independent of the HTTP status code.
+		Code string `json:"code"`
+
+		// Details Safe machine-readable context; keys use snake_case.
+		Details   *map[string]interface{} `json:"details,omitempty"`
+		Message   string                  `json:"message"`
+		RequestId *string                 `json:"requestId,omitempty"`
 	} `json:"error"`
 }
 
