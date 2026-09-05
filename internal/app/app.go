@@ -75,6 +75,7 @@ func routes(database *pgxpool.Pool, logger *slog.Logger, publicURL string) http.
 
 	return otelhttp.NewHandler(httpserver.Chain(mux,
 		httpserver.WithRequestID,
+		httpserver.ServerTiming,
 		httpserver.Recover(logger),
 		httpserver.AccessLog(logger),
 		httpserver.CORS(publicURL),

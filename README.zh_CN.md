@@ -89,6 +89,8 @@ OTEL_SERVICE_NAME=gk
 
 内置导出器使用 OTLP over gRPC。通过 <http://localhost:16686> 的 Jaeger 查看 Trace，通过 <http://localhost:9090> 的 Prometheus 查看指标，Grafana 位于 <http://localhost:3000>。Grafana 数据源和仪表盘需要另外配置。日志保留在 stdout，不通过 OTLP 导出。
 
+响应包含 `Server-Timing: app;dur=<毫秒>`，统计后端处理至最终响应头发送前的耗时，不包含响应体传输。已有计时指标会保留。配置的 CORS 来源可以读取此响应头，并访问浏览器性能计时信息。
+
 - `GET /health/live`：进程存活检查。
 - `GET /health/ready`：数据库连接检查。
 

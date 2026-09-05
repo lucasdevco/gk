@@ -89,6 +89,8 @@ OTEL_SERVICE_NAME=gk
 
 The bundled exporter uses OTLP over gRPC. View traces in Jaeger at <http://localhost:16686>, metrics in Prometheus at <http://localhost:9090>, and Grafana at <http://localhost:3000>. Grafana data sources and dashboards must be configured separately. Logs remain on stdout; they are not exported through OTLP.
 
+Responses include `Server-Timing: app;dur=<milliseconds>`, measuring backend time until final response headers are sent, excluding body transmission. Existing timing metrics are preserved. The configured CORS origin can read the header and access browser performance timings.
+
 - `GET /health/live` reports process liveness.
 - `GET /health/ready` checks database connectivity.
 
