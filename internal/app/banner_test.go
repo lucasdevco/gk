@@ -11,10 +11,13 @@ import (
 func TestStartupBanner(t *testing.T) {
 	cfg := config.Config{Banner: true, LogFormat: "text", Environment: "test", Addr: ":9090"}
 	plain := startupBanner(cfg)
-	for _, want := range []string{"GK", version.Version, "Starting", "test", "Listen: http://localhost:9090", "Docs:   http://localhost:9090/api/docs", "Spec:   http://localhost:9090/api/openapi.yaml"} {
+	for _, want := range []string{"GK", version.Version, "Starting", "test", "Listen: http://localhost:9090", "Docs:   http://localhost:9090/api/docs"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("banner missing %q", want)
 		}
+	}
+	if strings.Contains(plain, "Spec:") || strings.Contains(plain, "/api/openapi.yaml") {
+		t.Fatal("banner must not include the specification address")
 	}
 	if strings.Contains(plain, "\x1b") {
 		t.Fatal("plain banner contains ANSI colors")
