@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Create a new Goose SQL migration"
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "usage: mise run db:migrate:new -- <name>" >&2
+  exit 2
+fi
+
+goose -dir db/migrations create "$1" sql

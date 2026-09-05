@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: gk
+          POSTGRES_USER: gk
+          POSTGRES_PASSWORD: gk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gk -d gk"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://gk:gk@localhost:5432/gk?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v3
+      - run: mise run setup
+      - run: mise run ci

@@ -1,0 +1,9 @@
+.env
+.DS_Store
+/dist/
+web/node_modules/
+web/src/lib/api-client/
+web/dist/assets/
+coverage/
+playwright-report/
+test-results/

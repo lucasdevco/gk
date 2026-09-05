@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: gk
+      POSTGRES_USER: gk
+      POSTGRES_PASSWORD: gk
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gk -d gk"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.139.0
+    profiles: [observability]
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "8889:8889"
+    depends_on: [jaeger]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    profiles: [observability]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+
+  prometheus:
+    image: prom/prometheus:v3.7.3
+    profiles: [observability]
+    command: ["--config.file=/etc/prometheus/prometheus.yaml"]
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:12.2.1
+    profiles: [observability]
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+
+volumes:
+  postgres-data:

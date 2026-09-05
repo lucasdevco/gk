@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #0f172a;
+  background:
+    radial-gradient(
+      circle at 15% 0%,
+      rgba(16, 185, 129, 0.13),
+      transparent 32rem
+    ),
+    #f8fafc;
+  font-synthesis: none;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+button,
+input {
+  font: inherit;
+}
+
+.eyebrow {
+  @apply inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold tracking-[0.18em] text-emerald-800;
+}
+
+.panel {
+  @apply rounded-3xl border border-white/80 bg-white/90 p-6 shadow-xl shadow-slate-200/60 backdrop-blur;
+}
+
+.task-input {
+  @apply min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100;
+}
+
+.primary-button {
+  @apply rounded-xl bg-slate-950 px-5 py-3 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.task-row {
+  @apply flex cursor-pointer items-center gap-4 rounded-xl border border-slate-100 px-4 py-4 transition hover:border-emerald-200 hover:bg-emerald-50/40;
+}
+
+.task-check {
+  @apply size-5 accent-emerald-600;
+}
+.empty {
+  @apply py-8 text-center text-sm text-slate-500;
+}

@@ -1,0 +1,70 @@
+[tools]
+go = "1.25.9"
+node = "24.14.1"
+pnpm = "11.8.0"
+"github:sqlc-dev/sqlc" = "1.29.0"
+"github:pressly/goose" = "3.27.1"
+
+[env]
+_.file = ".env"
+
+[tasks.setup]
+description = "Install Go and web dependencies, then generate code"
+run = "go mod download && env CI=true pnpm --dir web install --frozen-lockfile && mise run generate"
+
+[tasks.generate]
+description = "Generate sqlc, Go HTTP bindings, and the TypeScript client"
+depends = ["generate:db", "generate:api", "generate:web"]
+
+[tasks."generate:db"]
+run = "sqlc generate"
+
+[tasks."generate:api"]
+run = "go tool oapi-codegen --config api/oapi-codegen.yaml api/openapi.yaml"
+
+[tasks."generate:web"]
+dir = "web"
+run = "env CI=true pnpm run generate"
+
+[tasks.dev]
+description = "Run PostgreSQL, the Go API, and Vite"
+depends = ["dev:api", "dev:web"]
+
+[tasks."dev:api"]
+depends = ["docker:up"]
+run = "go run ./cmd/gkd"
+
+[tasks."dev:web"]
+dir = "web"
+run = "pnpm run dev"
+
+[tasks."build:web"]
+dir = "web"
+run = "env CI=true pnpm run build"
+
+[tasks.build]
+description = "Build the embedded web UI and gkd binary"
+depends = ["generate"]
+run = "mise run build:web && mkdir -p dist/bin && go build -ldflags='-X gk/internal/platform/version.Version=dev' -o dist/bin/gkd ./cmd/gkd"
+
+[tasks.test]
+description = "Run backend and frontend unit tests"
+run = "go test ./... && env CI=true pnpm --dir web test"
+
+[tasks.format]
+run = "go fmt ./... && env CI=true pnpm --dir web exec prettier --write ."
+
+[tasks.lint]
+run = "go vet ./... && env CI=true pnpm --dir web exec tsc --noEmit"
+
+[tasks.ci]
+run = "mise run generate && mise run lint && mise run test && mise run build"
+
+[tasks."docker:up"]
+run = "docker compose -f deploy/compose.yaml up -d --wait postgres"
+
+[tasks."docker:observability"]
+run = "docker compose -f deploy/compose.yaml --profile observability up -d"
+
+[tasks."docker:down"]
+run = "docker compose -f deploy/compose.yaml --profile observability down"
