@@ -1,6 +1,7 @@
 .env
 .DS_Store
 /dist/
+/tmp/
 web/node_modules/
 web/src/lib/api-client/
 web/dist/assets/
