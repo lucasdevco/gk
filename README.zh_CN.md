@@ -54,7 +54,6 @@ mise run lint                     # 运行 go vet 和 TypeScript 检查
 mise run format                   # 格式化 Go 和前端代码
 mise run ci                       # 代码生成、检查、测试和构建
 mise run db:migrate:new -- add_x   # 创建 SQL 迁移
-mise run docker:observability     # 启动本地可观测性栈
 mise run docker:down              # 停止容器，保留数据库卷
 ```
 
@@ -83,15 +82,11 @@ deploy                   Docker 与本地可观测性配置
 
 日志写入 stdout。设置 `LOG_FORMAT=json` 使用结构化输出，通过 `LOG_LEVEL` 控制日志级别。文本日志级别默认着色（debug 青色、info 绿色、warn 黄色、error 红色），设置 `LOG_COLOR=false` 可关闭。JSON 输出忽略此配置；开启后，重定向输出也会包含 ANSI 颜色码。不要记录凭证或敏感请求内容。
 
-本地启用遥测时，先运行 `mise run docker:observability`，再将以下配置加入 `.env` 并重启后端：
+可观测性按需启用：执行 `mise run docker:observability`，将 `.env.example` 中注释的本地 `OTEL_*` 配置启用到 `.env`，再重启 API。`mise run dev` 除 API 和 Vite 外只自动启动 PostgreSQL。
 
-```dotenv
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-OTEL_EXPORTER_OTLP_INSECURE=true
-OTEL_SERVICE_NAME=gk
-```
+内置导出器使用 OTLP over gRPC。通过 <http://localhost:16686> 的 Jaeger 查看 Trace，通过 <http://localhost:9090> 的 Prometheus 查看指标，Grafana 位于 <http://localhost:3000>。本地 Grafana 无需登录即可使用组织管理员权限，仅监听 127.0.0.1。Grafana 自动配置 Prometheus、Jaeger 数据源和 GK Observability Demo 仪表盘。日志保留在 stdout，不通过 OTLP 导出。
 
-内置导出器使用 OTLP over gRPC。通过 <http://localhost:16686> 的 Jaeger 查看 Trace，通过 <http://localhost:9090> 的 Prometheus 查看指标，Grafana 位于 <http://localhost:3000>。Grafana 数据源和仪表盘需要另外配置。日志保留在 stdout，不通过 OTLP 导出。
+开发环境中，在 [API 文档](http://localhost:8080/api/docs) 选择 `baseline`、`slow-dependency` 或 `retry`，发送 `{}` 即可演示。在 [Grafana 仪表盘](http://localhost:3000/d/gk-observability) 查看指标，将响应的 `traceId` 粘贴到 Jaeger 查看调用链。指标约需等待 20–30 秒。
 
 响应包含 `Server-Timing: app;dur=<毫秒>`，统计后端处理至最终响应头发送前的耗时，不包含响应体传输。已有计时指标会保留。配置的 CORS 来源可以读取此响应头，并访问浏览器性能计时信息。
 
@@ -114,3 +109,7 @@ OTEL_SERVICE_NAME=gk
 6. 添加前端功能及行为测试。
 
 将 sqlc 行类型保留在存储适配器内部。业务调用方使用领域类型，HTTP 适配器负责将其映射为生成的接口合约类型。
+
+生产服务指标见 [GK Service Overview](http://localhost:3000/d/gk-service)：按服务、环境、实例筛选 HTTP 请求量、4xx/5xx、P95/P99、Go 内存及数据库连接池。HTTP 面板排除健康检查和演示流量，使用至少 4 分钟的速率窗口以适配默认 60 秒导出。多实例启动时自动生成 `service.instance.id`，也可通过 `OTEL_RESOURCE_ATTRIBUTES` 设置。接入自己的 Collector 时保留 `deploy/otel-collector.yaml` 的服务/环境标签映射；Prometheus 抓取启用 `honor_labels`。这是可复用的服务监控面板，本地匿名 Grafana Compose 配置不用于生产部署。
+
+造数据：启动服务并启用遥测后，执行 `python3 scripts/traffic.py --duration 180 --rate 10`。脚本按正常 → 4xx 错误 → 恢复三个阶段发送真实请求，不创建或修改业务数据；`--url` 指定地址，`--concurrency` 限制并发，`--demo` 额外产生开发演示场景的数据。默认 60 秒导出时可运行 `--duration 600`，让每个阶段覆盖多个导出周期。脚本不伪造 5xx；数据库不可用等真实故障才会让服务端错误率上升。

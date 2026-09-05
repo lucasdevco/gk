@@ -13,6 +13,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for ObservabilityScenarioResultOutcome.
+const (
+	Success ObservabilityScenarioResultOutcome = "success"
+)
+
+// Valid indicates whether the value is a known member of the ObservabilityScenarioResultOutcome enum.
+func (e ObservabilityScenarioResultOutcome) Valid() bool {
+	switch e {
+	case Success:
+		return true
+	default:
+		return false
+	}
+}
+
 // Error defines model for Error.
 type Error struct {
 	Error struct {
@@ -25,6 +40,29 @@ type Error struct {
 		RequestId *string                 `json:"requestId,omitempty"`
 	} `json:"error"`
 }
+
+// ObservabilityScenarioRequest defines model for ObservabilityScenarioRequest.
+type ObservabilityScenarioRequest struct {
+	// DelayMs Only accepted by slow-dependency; delay in the simulated dependency.
+	DelayMs *int `json:"delayMs,omitempty"`
+
+	// FailuresBeforeSuccess Only accepted by retry; failed attempts before eventual success.
+	FailuresBeforeSuccess *int `json:"failuresBeforeSuccess,omitempty"`
+}
+
+// ObservabilityScenarioResult defines model for ObservabilityScenarioResult.
+type ObservabilityScenarioResult struct {
+	Attempts   int                                `json:"attempts"`
+	DurationMs int64                              `json:"durationMs"`
+	Outcome    ObservabilityScenarioResultOutcome `json:"outcome"`
+	Scenario   string                             `json:"scenario"`
+
+	// TraceId Omitted without a valid span context; not proof of export.
+	TraceId *string `json:"traceId,omitempty"`
+}
+
+// ObservabilityScenarioResultOutcome defines model for ObservabilityScenarioResult.Outcome.
+type ObservabilityScenarioResultOutcome string
 
 // Task defines model for Task.
 type Task struct {
@@ -45,6 +83,9 @@ type UpdateTaskJSONBody struct {
 	Completed bool `json:"completed"`
 }
 
+// RunObservabilityScenarioJSONRequestBody defines body for RunObservabilityScenario for application/json ContentType.
+type RunObservabilityScenarioJSONRequestBody = ObservabilityScenarioRequest
+
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody CreateTaskJSONBody
 
@@ -53,6 +94,9 @@ type UpdateTaskJSONRequestBody UpdateTaskJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Run a bounded development-only observability demonstration
+	// (POST /api/v1/observability/scenarios/{scenario}/run)
+	RunObservabilityScenario(w http.ResponseWriter, r *http.Request, scenario string)
 	// List tasks
 	// (GET /api/v1/tasks)
 	ListTasks(w http.ResponseWriter, r *http.Request)
@@ -72,6 +116,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// RunObservabilityScenario operation middleware
+func (siw *ServerInterfaceWrapper) RunObservabilityScenario(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "scenario" -------------
+	var scenario string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scenario", r.PathValue("scenario"), &scenario, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scenario", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunObservabilityScenario(w, r, scenario)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListTasks operation middleware
 func (siw *ServerInterfaceWrapper) ListTasks(w http.ResponseWriter, r *http.Request) {
@@ -247,6 +317,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/observability/scenarios/{scenario}/run", wrapper.RunObservabilityScenario)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/tasks", wrapper.ListTasks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/tasks", wrapper.CreateTask)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/tasks/{id}", wrapper.UpdateTask)

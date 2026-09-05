@@ -5,6 +5,45 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/observability/scenarios/{scenario}/run:
+    post:
+      operationId: runObservabilityScenario
+      summary: Run a bounded development-only observability demonstration
+      description: Available only when APP_ENV=development. No external dependencies or database writes. At most four concurrent runs per process.
+      parameters:
+        - name: scenario
+          in: path
+          required: true
+          schema:
+            type: string
+          description: One of baseline, slow-dependency, or retry. Unknown names return 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObservabilityScenarioRequest"
+            example: {}
+      responses:
+        "200":
+          description: Completed scenario; intermediate retry failures may have occurred.
+          headers:
+            X-Trace-Id:
+              description: Trace ID when a valid span context exists; does not guarantee export or sampling.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObservabilityScenarioResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "408":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /api/v1/tasks:
     get:
       operationId: listTasks
@@ -85,6 +124,39 @@ paths:
           $ref: "#/components/responses/Error"
 components:
   schemas:
+    ObservabilityScenarioRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        delayMs:
+          type: integer
+          minimum: 0
+          maximum: 3000
+          default: 1500
+          description: Only accepted by slow-dependency; delay in the simulated dependency.
+        failuresBeforeSuccess:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 2
+          description: Only accepted by retry; failed attempts before eventual success.
+    ObservabilityScenarioResult:
+      type: object
+      required: [scenario, outcome, attempts, durationMs]
+      properties:
+        scenario:
+          type: string
+        outcome:
+          type: string
+          enum: [success]
+        attempts:
+          type: integer
+        durationMs:
+          type: integer
+          format: int64
+        traceId:
+          type: string
+          description: Omitted without a valid span context; not proof of export.
     Task:
       type: object
       required: [id, title, completed, createdAt, updatedAt]

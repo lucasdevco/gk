@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	otelruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -34,6 +35,7 @@ func Init(ctx context.Context, serviceName, version, environment string) (*Provi
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName(serviceName),
+			semconv.ServiceInstanceID(uuid.NewString()),
 			semconv.ServiceVersion(version),
 			attribute.String("deployment.environment.name", environment),
 		),

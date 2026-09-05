@@ -54,7 +54,6 @@ mise run lint                     # Run go vet and TypeScript checks
 mise run format                   # Format Go and frontend code
 mise run ci                       # Generate, lint, test, and build
 mise run db:migrate:new -- add_x   # Create a SQL migration
-mise run docker:observability     # Start the local observability stack
 mise run docker:down              # Stop containers; retain database volume
 ```
 
@@ -83,15 +82,11 @@ Configuration comes from environment variables. mise loads `.env` for local comm
 
 Logs go to stdout. Set `LOG_FORMAT=json` for structured output and `LOG_LEVEL` to control verbosity. Text log levels are colored by default (debug: cyan, info: green, warn: yellow, error: red); set `LOG_COLOR=false` to disable colors. JSON output ignores this setting; when enabled, ANSI colors are also written to redirected output. Avoid logging credentials or sensitive payloads.
 
-To enable telemetry locally, start `mise run docker:observability`, then add these values to `.env` and restart the backend:
+Observability is optional: run `mise run docker:observability`, enable the commented local `OTEL_*` settings in `.env.example` in your `.env`, and restart the API. `mise run dev` starts only PostgreSQL alongside the API and Vite.
 
-```dotenv
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-OTEL_EXPORTER_OTLP_INSECURE=true
-OTEL_SERVICE_NAME=gk
-```
+The bundled exporter uses OTLP over gRPC. View traces in Jaeger at <http://localhost:16686>, metrics in Prometheus at <http://localhost:9090>, and Grafana at <http://localhost:3000>. Local Grafana allows anonymous organization administration without login and listens only on 127.0.0.1. Grafana automatically provisions Prometheus and Jaeger data sources and the GK Observability Demo dashboard. Logs remain on stdout; they are not exported through OTLP.
 
-The bundled exporter uses OTLP over gRPC. View traces in Jaeger at <http://localhost:16686>, metrics in Prometheus at <http://localhost:9090>, and Grafana at <http://localhost:3000>. Grafana data sources and dashboards must be configured separately. Logs remain on stdout; they are not exported through OTLP.
+In development, use [API docs](http://localhost:8080/api/docs) to run `baseline`, `slow-dependency`, or `retry` with `{}`. View metrics in the [Grafana dashboard](http://localhost:3000/d/gk-observability) and find the response's `traceId` in Jaeger. Allow 20–30 seconds for metrics to appear.
 
 Responses include `Server-Timing: app;dur=<milliseconds>`, measuring backend time until final response headers are sent, excluding body transmission. Existing timing metrics are preserved. The configured CORS origin can read the header and access browser performance timings.
 
@@ -114,3 +109,7 @@ The shared HTTP helpers return `{ "error": { "code": "task_not_found", "message"
 6. Add the frontend feature and tests for its behavior.
 
 Keep sqlc row types inside the storage adapter. Return domain types to business callers and map them to the generated contract in the HTTP adapter.
+
+The [GK Service Overview](http://localhost:3000/d/gk-service) monitors HTTP throughput, 4xx/5xx ratios, P95/P99, Go memory, and database pools, filtered by service, environment, and instance. HTTP panels exclude health probes and demo traffic; rate windows are at least four minutes to accommodate default 60-second exports. Each process generates `service.instance.id`, overridable through `OTEL_RESOURCE_ATTRIBUTES`. When using your own Collector, retain the service/environment label mapping in `deploy/otel-collector.yaml` and enable Prometheus `honor_labels`. The dashboard is reusable for deployed services; the anonymous local Grafana Compose configuration is not a production deployment.
+
+Generate traffic after starting the API and enabling telemetry: `python3 scripts/traffic.py --duration 180 --rate 10`. The script sends real requests through normal → 4xx errors → recovery phases without creating or modifying task data. Use `--url` for another origin, `--concurrency` to bound in-flight requests, or `--demo` to also exercise development scenarios. With default 60-second exports, use `--duration 600` so each phase spans multiple exports. It does not fabricate 5xx; real server failures such as database outages raise that ratio.

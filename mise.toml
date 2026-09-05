@@ -64,7 +64,8 @@ run = "mise run generate && mise run lint && mise run test && mise run build"
 run = "docker compose -f deploy/compose.yaml up -d --wait postgres"
 
 [tasks."docker:observability"]
-run = "docker compose -f deploy/compose.yaml --profile observability up -d"
+description = "Start only the local observability stack"
+run = "docker compose -f deploy/compose.yaml --profile observability up -d --wait otel-collector prometheus grafana"
 
 [tasks."docker:down"]
 run = "docker compose -f deploy/compose.yaml --profile observability down"

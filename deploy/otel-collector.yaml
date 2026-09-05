@@ -4,6 +4,14 @@ receivers:
       grpc:
         endpoint: 0.0.0.0:4317
 
+processors:
+  transform/service_labels:
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(attributes["service_name"], resource.attributes["service.name"])
+          - set(attributes["deployment_environment"], resource.attributes["deployment.environment.name"])
+
 exporters:
   debug:
     verbosity: basic
@@ -13,6 +21,7 @@ exporters:
       insecure: true
   prometheus:
     endpoint: 0.0.0.0:8889
+    send_timestamps: true
 
 service:
   pipelines:
@@ -21,4 +30,5 @@ service:
       exporters: [otlp/jaeger, debug]
     metrics:
       receivers: [otlp]
+      processors: [transform/service_labels]
       exporters: [prometheus]

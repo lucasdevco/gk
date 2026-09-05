@@ -76,5 +76,3 @@ func toAPI(value Task) api.Task {
 		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
 }
-
-var _ api.ServerInterface = (*HTTPHandler)(nil)

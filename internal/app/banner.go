@@ -14,12 +14,25 @@ func startupBanner(cfg config.Config) string {
 	if !cfg.Banner || cfg.LogFormat == "json" {
 		return ""
 	}
-	logo := "  ██████╗ ██╗  ██╗\n  ██╔════╝ ██║ ██╔╝\n  ██║  ███╗█████╔╝ \n  ██║   ██║██╔═██╗ \n  ╚██████╔╝██║  ██╗\n   ╚═════╝ ╚═╝  ╚═╝"
+	logo := `  ██████╗ ██╗  ██╗
+  ██╔════╝ ██║ ██╔╝
+  ██║  ███╗█████╔╝ 
+  ██║   ██║██╔═██╗ 
+  ╚██████╔╝██║  ██╗
+   ╚═════╝ ╚═╝  ╚═╝`
 	if cfg.LogColor {
 		logo = "\x1b[36m" + logo + "\x1b[0m"
 	}
 	baseURL := bannerURL(cfg.Addr)
-	return fmt.Sprintf("\n%s\n\n  GK · Go + React starter\n  Starting %s (%s)\n  Listen: %s\n  Docs:   %s/api/docs\n  Spec:   %s/api/openapi.yaml\n\n", logo, version.Version, cfg.Environment, baseURL, baseURL, baseURL)
+	return fmt.Sprintf(`
+%s
+
+  GK · Go + React starter
+  Starting %s (%s)
+  Listen: %s
+  Docs:   %s/api/docs
+
+`, logo, version.Version, cfg.Environment, baseURL, baseURL)
 }
 
 func bannerURL(addr string) string {

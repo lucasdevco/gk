@@ -14,6 +14,7 @@ import (
 
 	"gk/api"
 	"gk/db/sqlc"
+	"gk/internal/observabilitydemo"
 	"gk/internal/platform/config"
 	"gk/internal/platform/httpserver"
 	"gk/internal/platform/logging"
@@ -51,19 +52,23 @@ func Run(ctx context.Context) error {
 	}
 	defer database.Close()
 
-	handler := routes(database, logger, cfg.PublicURL)
+	demo, err := observabilitydemo.New(logger, cfg.Environment)
+	if err != nil {
+		return fmt.Errorf("initialize observability demo: %w", err)
+	}
+	handler := routes(database, logger, cfg.PublicURL, demo)
 	server := httpserver.New(cfg.Addr, handler, logger, cfg.ShutdownTimeout)
 	return server.Run(ctx)
 }
 
-func routes(database *pgxpool.Pool, logger *slog.Logger, publicURL string) http.Handler {
+func routes(database *pgxpool.Pool, logger *slog.Logger, publicURL string, demo *observabilitydemo.Handler) http.Handler {
 	taskRepository := task.NewPostgresRepository(sqlc.New(database))
 	taskService := task.NewService(taskRepository)
 	taskHandler := task.NewHTTPHandler(taskService, logger.With("module", "task"))
 
 	mux := http.NewServeMux()
 	api.RegisterDocs(mux)
-	mux.Handle("/api/", api.Handler(taskHandler))
+	mux.Handle("/api/", api.Handler(&apiHandlers{HTTPHandler: taskHandler, Handler: demo}))
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) {
 		httpserver.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -82,5 +87,14 @@ func routes(database *pgxpool.Pool, logger *slog.Logger, publicURL string) http.
 		httpserver.Recover(logger),
 		httpserver.AccessLog(logger),
 		httpserver.CORS(publicURL),
+		httpserver.RouteTelemetry,
 	), "http.server")
 }
+
+// apiHandlers assembles independent modules behind the generated contract.
+type apiHandlers struct {
+	*task.HTTPHandler
+	*observabilitydemo.Handler
+}
+
+var _ api.ServerInterface = (*apiHandlers)(nil)

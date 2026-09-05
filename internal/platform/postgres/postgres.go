@@ -63,13 +63,18 @@ func registerMetrics(pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
+	max, err := meter.Int64ObservableGauge("gk.db.pool.connections.max")
+	if err != nil {
+		return err
+	}
 	_, err = meter.RegisterCallback(func(_ context.Context, observer metric.Observer) error {
 		stats := pool.Stat()
 		observer.ObserveInt64(total, int64(stats.TotalConns()))
 		observer.ObserveInt64(acquired, int64(stats.AcquiredConns()))
 		observer.ObserveInt64(idle, int64(stats.IdleConns()))
+		observer.ObserveInt64(max, int64(stats.MaxConns()))
 		return nil
-	}, total, acquired, idle)
+	}, total, acquired, idle, max)
 	return err
 }
 
