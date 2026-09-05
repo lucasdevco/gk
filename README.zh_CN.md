@@ -79,7 +79,7 @@ deploy                   Docker 与本地可观测性配置
 
 应用通过环境变量配置。mise 在本地命令中加载 `.env`；直接运行二进制时，需要通过 Shell 或部署平台注入环境变量。默认值见 [.env.example](.env.example)。后端启动时自动执行数据库迁移。
 
-日志写入 stdout。设置 `LOG_FORMAT=json` 使用结构化输出，通过 `LOG_LEVEL` 控制日志级别。不要记录凭证或敏感请求内容。
+日志写入 stdout。设置 `LOG_FORMAT=json` 使用结构化输出，通过 `LOG_LEVEL` 控制日志级别。文本日志级别默认着色（debug 青色、info 绿色、warn 黄色、error 红色），设置 `LOG_COLOR=false` 可关闭。JSON 输出忽略此配置；开启后，重定向输出也会包含 ANSI 颜色码。不要记录凭证或敏感请求内容。
 
 本地启用遥测时，先运行 `mise run docker:observability`，再将以下配置加入 `.env` 并重启后端：
 

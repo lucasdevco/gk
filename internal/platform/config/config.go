@@ -15,6 +15,7 @@ type Config struct {
 	DatabaseURL     string        `env:"DATABASE_URL" envDefault:"postgres://gk:gk@localhost:5432/gk?sslmode=disable"`
 	LogLevel        string        `env:"LOG_LEVEL" envDefault:"info"`
 	LogFormat       string        `env:"LOG_FORMAT" envDefault:"text"`
+	LogColor        bool          `env:"LOG_COLOR" envDefault:"true"`
 	ServiceName     string        `env:"OTEL_SERVICE_NAME" envDefault:"gk"`
 	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT" envDefault:"10s"`
 }

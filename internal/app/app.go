@@ -28,7 +28,7 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	logger := logging.New(cfg.LogLevel, cfg.LogFormat, cfg.Environment)
+	logger := logging.New(cfg.LogLevel, cfg.LogFormat, cfg.Environment, cfg.LogColor)
 	slog.SetDefault(logger)
 
 	telemetry, err := observability.Init(ctx, cfg.ServiceName, version.Version, cfg.Environment)

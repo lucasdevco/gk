@@ -79,7 +79,7 @@ Each business module owns its model, logic, and HTTP/storage adapters. A small r
 
 Configuration comes from environment variables. mise loads `.env` for local commands; when running the binary directly, supply environment variables through your shell or deployment platform. See [.env.example](.env.example) for defaults. Database migrations run when the backend starts.
 
-Logs go to stdout. Set `LOG_FORMAT=json` for structured output and `LOG_LEVEL` to control verbosity. Avoid logging credentials or sensitive payloads.
+Logs go to stdout. Set `LOG_FORMAT=json` for structured output and `LOG_LEVEL` to control verbosity. Text log levels are colored by default (debug: cyan, info: green, warn: yellow, error: red); set `LOG_COLOR=false` to disable colors. JSON output ignores this setting; when enabled, ANSI colors are also written to redirected output. Avoid logging credentials or sensitive payloads.
 
 To enable telemetry locally, start `mise run docker:observability`, then add these values to `.env` and restart the backend:
 

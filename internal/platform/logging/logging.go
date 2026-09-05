@@ -2,7 +2,9 @@
 package logging
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -10,15 +12,66 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func New(level, format, environment string) *slog.Logger {
+func New(level, format, environment string, color bool) *slog.Logger {
+	return newLogger(os.Stdout, level, format, environment, color)
+}
+
+func newLogger(output io.Writer, level, format, environment string, color bool) *slog.Logger {
 	options := &slog.HandlerOptions{Level: parseLevel(level)}
 	var handler slog.Handler
 	if format == "json" {
-		handler = slog.NewJSONHandler(os.Stdout, options)
+		handler = slog.NewJSONHandler(output, options)
 	} else {
-		handler = slog.NewTextHandler(os.Stdout, options)
+		if color {
+			output = colorWriter{output}
+		}
+		handler = slog.NewTextHandler(output, options)
 	}
 	return slog.New(&traceHandler{Handler: handler}).With("service", "gk", "environment", environment)
+}
+
+// colorWriter colors only the built-in level field. Decorating the serialized
+// text keeps ANSI escapes out of slog's quoted attribute values.
+type colorWriter struct{ io.Writer }
+
+func (w colorWriter) Write(p []byte) (int, error) {
+	start := bytes.Index(p, []byte(" level="))
+	if start < 0 {
+		return w.Writer.Write(p)
+	}
+	start++
+	end := bytes.IndexByte(p[start:], ' ')
+	if end < 0 {
+		return w.Writer.Write(p)
+	}
+	end += start
+	var color string
+	switch string(p[start:end]) {
+	case "level=DEBUG":
+		color = "\x1b[36m"
+	case "level=INFO":
+		color = "\x1b[32m"
+	case "level=WARN":
+		color = "\x1b[33m"
+	case "level=ERROR":
+		color = "\x1b[31m"
+	default:
+		return w.Writer.Write(p)
+	}
+	line := make([]byte, 0, len(p)+len(color)+4)
+	line = append(line, p[:start]...)
+	line = append(line, color...)
+	line = append(line, p[start:end]...)
+	line = append(line, "\x1b[0m"...)
+	line = append(line, p[end:]...)
+	n, err := w.Writer.Write(line)
+	if err == nil && n != len(line) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 func parseLevel(value string) slog.Level {
