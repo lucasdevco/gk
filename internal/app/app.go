@@ -60,6 +60,7 @@ func routes(database *pgxpool.Pool, logger *slog.Logger, publicURL string) http.
 	taskHandler := task.NewHTTPHandler(taskService, logger.With("module", "task"))
 
 	mux := http.NewServeMux()
+	api.RegisterDocs(mux)
 	mux.Handle("/api/", api.Handler(taskHandler))
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) {
 		httpserver.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})

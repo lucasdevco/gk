@@ -44,6 +44,8 @@ mise run dev
 
 ## 常用命令
 
+交互式 API 文档位于 <http://localhost:8080/docs>，原始合约位于 <http://localhost:8080/openapi.yaml>。两条路径也支持通过 5173 端口的 Vite 开发服务器访问。Swagger UI 支持向当前来源发送接口调试请求。固定版本的 JavaScript 和 CSS 从 unpkg 加载，需要联网；OpenAPI 合约嵌入二进制，由服务本地提供。
+
 ```bash
 mise run generate                 # 生成 SQL 查询、Go 绑定和 TypeScript SDK
 mise run build                    # 构建前端和 dist/bin/gkd

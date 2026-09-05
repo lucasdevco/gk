@@ -12,6 +12,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
+      "/docs": "http://localhost:8080",
+      "/openapi.yaml": "http://localhost:8080",
       "/api": "http://localhost:8080",
       "/health": "http://localhost:8080",
     },
