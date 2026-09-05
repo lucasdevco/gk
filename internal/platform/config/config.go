@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	Environment     string        `env:"APP_ENV" envDefault:"development"`
+	Banner          bool          `env:"APP_BANNER" envDefault:"true"`
 	Addr            string        `env:"APP_ADDR" envDefault:":8080"`
 	PublicURL       string        `env:"APP_PUBLIC_URL" envDefault:"http://localhost:8080"`
 	DatabaseURL     string        `env:"DATABASE_URL" envDefault:"postgres://gk:gk@localhost:5432/gk?sslmode=disable"`

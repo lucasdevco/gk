@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,6 +31,7 @@ func Run(ctx context.Context) error {
 	}
 	logger := logging.New(cfg.LogLevel, cfg.LogFormat, cfg.Environment, cfg.LogColor)
 	slog.SetDefault(logger)
+	fmt.Fprint(os.Stdout, startupBanner(cfg))
 
 	telemetry, err := observability.Init(ctx, cfg.ServiceName, version.Version, cfg.Environment)
 	if err != nil {
